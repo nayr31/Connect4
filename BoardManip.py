@@ -1,12 +1,16 @@
-import random
+# This file is for anything that relates to the board. The main program should not know what it needs to do, only what it wants to.
+# This could just be my Java seeping into my Python, but this is how I like it.
+
+import random, PVector
 
 # Constants
 width, height = 7, 6
-top_string = " 0 1 2 3 4 5 6"
+top_string = " 0 1 2 3 4 5 6 "
+moves = []
 
 # Board information and setup
 ## I ended up using a 1 for an empty space, 2 for a player space, and 0 for an AI space
-## Yes it is dumb
+## Yes it is dumb, no I am not going to change it
 board = []
 for i in range(height):
     board.append(list(range(width)))
@@ -46,7 +50,6 @@ def is_valid_drop(column):
         print("Selected column is too " + "high" if column > width-1 else + "low" + ". Try again.")
         return False
     # Then we can check for column validity
-    # Check the top most row (board[0]) for a 1
     ## A "1" indicates an empty space, meaning we can place something there
     if board[0][column] != 1:
         print("Column is full! Try another.")
@@ -71,6 +74,7 @@ def place_piece(selection, token):
 
 # A stupidly named method, this actually is the "take turn" method
 # Basically depending on which turn it is the program will do whatever it needs to for that player
+# This allows the main runtime to choose how it wants to run the game, while this just takes care of the backend
 def dropPiece(is_player):
     selection = -1
 
@@ -85,7 +89,10 @@ def dropPiece(is_player):
         place_piece(selection, 2)
         ## Done the player's turn
     else:
-        ## AI mumbo jumbo
+        # AI is supposed to be "Minimax", meaning it looks a certain distance in the future (board states) then chooses the best outcome.
+        # Alpha-beta pruning will be used to determine b-tree outcomes that just don't look great and we can ignore.
+        #   This will speed up the program by looking at less possibilities, while also reducing memory usage by storing less values.
+        #   Maybe higher winning odds as well?
         print("Beep bop, I am a robot.")
 
         while True:
@@ -173,3 +180,28 @@ def check_for_four():
 # Returns the value on the board when given a point (list of two numbers)
 def val_at(point):
     return board[point[0], point[1]]
+
+def test_move():
+    move = PVector(1, 1, 2)
+    make_move(move)
+    move = PVector(1, 2, 2)
+    make_move(move)
+    move = PVector(1, 3, 2)
+    make_move(move)
+
+# The following methods use the concept of a "move".
+## A move is defined as the position and piece that was placed.
+## The PVector object stores the location and piece data in a single object
+# This concept allows us to make and unmake moves easily for recursive tree searching
+def make_move(move):
+    #print("Making move: x=" + str(move.x) + " y=" + str(move.y) + " data=" + str(move.data))
+    moves.append(move)
+    board[move.y][move.x] = move.data
+
+def unmake_move():
+    move = moves.pop()
+    board[move.y][move.x] = 1
+
+def unmake_move(move):
+    moves.pop()
+    board[move.y][move.x] = 1

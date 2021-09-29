@@ -27,7 +27,7 @@ while not game_over:
     elif not received_point == [-1, -1]:
         board.printBoard()
         ## This funky ternary knows who won by the founded 4 string of pieces
-        print("Player " if board.val_at(received_point) == 2 else "AI" + "has won.")
+        print("Player " if board.moves[-1].data == 2 else "AI" + "has won.")
         game_over = True
 
     ## No winner, toggle turn
