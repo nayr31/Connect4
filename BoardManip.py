@@ -1,7 +1,8 @@
 # This file is for anything that relates to the board. The main program should not know what it needs to do, only what it wants to.
 # This could just be my Java seeping into my Python, but this is how I like it.
 
-import random, PVector
+from PVector import PVector
+import random
 
 # Constants
 width, height = 7, 6
@@ -182,12 +183,10 @@ def val_at(point):
     return board[point[0], point[1]]
 
 def test_move():
-    move = PVector(1, 1, 2)
+    move = PVector(0, 5, 2)
     make_move(move)
-    move = PVector(1, 2, 2)
-    make_move(move)
-    move = PVector(1, 3, 2)
-    make_move(move)
+    make_move(PVector(0, 3, 2))
+    make_move(PVector(0, 4, 2))
 
 # The following methods use the concept of a "move".
 ## A move is defined as the position and piece that was placed.
