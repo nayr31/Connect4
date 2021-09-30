@@ -8,6 +8,8 @@ import random
 width, height = 7, 6
 top_string = " 0 1 2 3 4 5 6 "
 moves = []
+player_token, empty_token, ai_token = 2, 1, 0
+lowest_in_column = [-1, -1, -1, -1, -1, -1, -1]
 
 # Board information and setup
 ## I ended up using a 1 for an empty space, 2 for a player space, and 0 for an AI space
@@ -17,10 +19,10 @@ for i in range(height):
     board.append(list(range(width)))
 for i in range(height):
     for j in range(width):
-        board[i][j] = 1
+        board[i][j] = empty_token
 #last_place = [-1, -1]
 
-# Prints the board according to the example given:
+# Prints the board according to the example given (without the pieces):
 ##  0 1 2 3 4 5 6
 ## | | | | | | | |
 ## | | | | | | | |
@@ -39,7 +41,7 @@ def printBoard():
             ## So that every iteration we put the left wall and its contents "|X"
             build_string += "|"
             #print("Checking spot: " + str(spot))
-            build_string +=  "X" if str(spot) == "2" else " " if str(spot) == "1" else "0"
+            build_string +=  "X" if str(spot) == str(player_token) else " " if str(spot) == str(empty_token) else "0"
         ## Ending with the capstone "|X|O|""
         build_string += "|"
         print(build_string)
@@ -52,7 +54,7 @@ def is_valid_drop(column):
         return False
     # Then we can check for column validity
     ## A "1" indicates an empty space, meaning we can place something there
-    if board[0][column] != 1:
+    if board[0][column] != empty_token:
         print("Column is full! Try another.")
         return False
     ## Yes this could have just returned board[0][column] == 1, but I wanted error specific messages
@@ -65,7 +67,7 @@ def place_piece(selection, token):
 
     ## Iterate through each of the 6 rows (i) and find the "lowest" box without a "1"
     for i in range(height):
-        if board[i][selection] == 1:
+        if board[i][selection] == empty_token:
             lowest_point = i
 
     ## Lowest point found, set the token
@@ -87,11 +89,11 @@ def dropPiece(is_player):
             if is_valid_drop(selection):
                 break
 
-        place_piece(selection, 2)
+        place_piece(selection, player_token)
         ## Done the player's turn
     else:
         # AI is supposed to be "Minimax", meaning it looks a certain distance in the future (board states) then chooses the best outcome.
-        # Alpha-beta pruning will be used to determine b-tree outcomes that just don't look great and we can ignore.
+        # Alpha-beta pruning should be used to determine b-tree outcomes that just don't look great and we can ignore.
         #   This will speed up the program by looking at less possibilities, while also reducing memory usage by storing less values.
         #   Maybe higher winning odds as well?
         print("Beep bop, I am a robot.")
@@ -102,8 +104,73 @@ def dropPiece(is_player):
 
             ## Check that it works
             if is_valid_drop(selection):
-                place_piece(selection, 0)
+                place_piece(selection, ai_token)
                 break
+
+# Returns a value associated with the current board state on the token given
+# Current checks:
+# - Max length of "possible" straight
+#   - Connecting the dots, take the example board state: 
+#     0 1 2 3 4 5 6
+#    | | | | | | | |
+#    | | | | | | | |
+#    | | | | | | | |
+#    |0| | | | |X|X|
+#    |0| | | | |X|0|
+#    |X|X|X|0| |0|0|
+#   - Notice how both X and 0 can make pairs of 3 (simple max = 3)
+#   - But, 0 has the sightline to make a straight of 4 (sightline max = 4)
+#   - In both cases, we only check the 7 columns
+def score_board(token):
+    # Generate lowest possible points
+    lowest_in_column = [-1, -1, -1, -1, -1, -1, -1]
+    for i in range(height):
+        for j in range(width):
+            if board[i][j] == empty_token:
+                lowest_in_column[j] = i
+    
+    # Check each of the points for each possible direction (not directly up)
+    ## Not really, all we are doing here are "simulating" (not even) a drop on how good each column is
+    best_col = -1
+    for i in range(width):
+        col_score = score_col(token, lowest_in_column[i], i,  0)
+        if col_score > best_col:
+            best_col = col_score
+
+def score_col(token, row, column, length):
+    best_len = -1 # Best length of this column, overall score
+    t_score = -1 # We don't want to call the same recursive function multiple times lol
+    # First check simple max
+    ## Left 3 (up-left, left, down-left)
+    if column != 0:
+        ## up-left
+        if row - 1 >= 0:
+            if board[row - 1][column - 1] == token:
+                t_score = score_col(token, row - 1, column - 1, length + 1)
+                if t_score >= best_len:
+                    best_len = t_score
+        ## left
+        if board[row][column - 1] == token:
+            t_score = score_col(token, row, column - 1, length + 1)
+            if t_score >= best_len:
+                best_len = t_score
+        ## down-left
+        if row + 1 < height:
+            if board[row + 1][column - 1] == token:
+                t_score = score_col(token, row + 1, column - 1, length + 1)
+                if t_score >= best_len:
+                    best_len = t_score
+
+    ## down
+    if row + 1 < height:
+        if board[row + 1][column] == token:
+
+    ## Right 3 (right-down, right, right-up)
+    if column != width-1:
+        
+        
+    
+    return length
 
 def check_for_four():
     ## Check in each direction for a connection, limited by the width/height of the board
@@ -120,7 +187,7 @@ def check_for_four():
         for column in range(width - 3):
             if board[row][column] == board[row][column + 1]\
                 == board[row][column + 2] == board[row][column + 3]\
-                    and not board[row][column] == 1:
+                    and not board[row][column] == empty_token:
                 return [row, column]
     
     ## Vertical
@@ -133,7 +200,7 @@ def check_for_four():
         for column in range(width):
             if board[row][column] == board[row + 1][column]\
                 == board[row + 2][column] == board[row + 3][column]\
-                and not board[row][column] == 1:
+                and not board[row][column] == empty_token:
                 return [row, column]
 
     ## Diagonal down (left to right)
@@ -146,7 +213,7 @@ def check_for_four():
         for column in range(width - 3):
             if board[row][column] == board[row + 1][column + 1]\
                 == board[row + 2][column + 2] == board[row + 3][column + 3]\
-                and not board[row][column] == 1:
+                and not board[row][column] == empty_token:
                 return [row, column]
 
     ## Diagonal up (left to right)
@@ -162,14 +229,14 @@ def check_for_four():
             #print("point : " + str(row) + str(column))
             if board[row][column] == board[row - 1][column + 1]\
                 == board[row - 2][column + 2] == board[row - 3][column + 3]\
-                and not board[row][column] == 1:
+                and not board[row][column] == empty_token:
                 return [row, column]
 
     ## Not connections, but the board could be full (making a tie)
     is_full = True
     for row in range(height):
         for column in range(width):
-            if board[row][column] == 1:
+            if board[row][column] == empty_token:
                 is_full = False
                 break
 
@@ -183,8 +250,6 @@ def val_at(point):
     return board[point[0], point[1]]
 
 def test_move():
-    move = PVector(0, 5, 2)
-    make_move(move)
     make_move(PVector(0, 3, 2))
     make_move(PVector(0, 4, 2))
 
@@ -199,8 +264,8 @@ def make_move(move):
 
 def unmake_move():
     move = moves.pop()
-    board[move.y][move.x] = 1
+    board[move.y][move.x] = empty_token
 
 def unmake_move(move):
     moves.pop()
-    board[move.y][move.x] = 1
+    board[move.y][move.x] = empty_token
