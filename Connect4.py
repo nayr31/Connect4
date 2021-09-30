@@ -7,8 +7,9 @@ player_turn = True
 ## Main game loop
 while not game_over:
     ## Print the board every time so we can see what happened
-    #board.test_move()
+    board.test_move()
     board.printBoard()
+    board.test_score_player()
 
     ## Decide who goes when
     if player_turn:

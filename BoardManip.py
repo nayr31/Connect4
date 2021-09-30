@@ -132,10 +132,16 @@ def score_board(token):
     # Check each of the points for each possible direction (not directly up)
     ## Not really, all we are doing here are "simulating" (not even) a drop on how good each column is
     best_col = -1
+    best_score = -1
     for i in range(width):
         col_score = score_col(token, lowest_in_column[i], i,  0)
+        ## If the score of this column was the best, then set set the column used to as the best one
         if col_score > best_col:
-            best_col = col_score
+            best_score = col_score
+            best_col = i
+    
+    print("Got best score of " + str(best_score) + " in " + str(i))
+    return [best_col]
 
 def score_col(token, row, column, length):
     best_len = -1 # Best length of this column, overall score
@@ -164,13 +170,31 @@ def score_col(token, row, column, length):
     ## down
     if row + 1 < height:
         if board[row + 1][column] == token:
+            t_score = score_col(token, row + 1, column, length + 1)
+            if t_score >= best_len:
+                best_len = t_score
 
     ## Right 3 (right-down, right, right-up)
     if column != width-1:
-        
-        
-    
-    return length
+        ## right-down
+        if row + 1 < height:
+            if board[row + 1][column + 1] == token:
+                t_score = score_col(token, row + 1, column + 1, length + 1)
+                if t_score >= best_len:
+                    best_len = t_score
+        ## right
+        if board[row][column + 1] == token:
+            t_score = score_col(token, row + 1, column + 1, length + 1)
+            if t_score >= best_len:
+                best_len = t_score
+        ## right-up
+        if row - 1 >= 0:
+            if board[row - 1][column + 1] == token:
+                t_score = score_col(token, row + 1, column + 1, length + 1)
+                if t_score >= best_len:
+                    best_len = t_score
+    ##TODO This returns the wrong value?
+    return best_len
 
 def check_for_four():
     ## Check in each direction for a connection, limited by the width/height of the board
@@ -249,9 +273,14 @@ def check_for_four():
 def val_at(point):
     return board[point[0], point[1]]
 
+# Test method; Sets selected coordinates to whatever you might need
 def test_move():
-    make_move(PVector(0, 3, 2))
-    make_move(PVector(0, 4, 2))
+    make_move(PVector(0, 5, player_token))
+    make_move(PVector(0, 4, player_token))
+
+# Test method; returns the current board score of the player
+def test_score_player():
+    return score_board(player_token)
 
 # The following methods use the concept of a "move".
 ## A move is defined as the position and piece that was placed.
