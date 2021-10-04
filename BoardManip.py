@@ -6,7 +6,7 @@ import random
 
 # Constants
 width, height = 7, 6
-top_string = " 0 1 2 3 4 5 6 "
+top_string = "+ 0 1 2 3 4 5 6 "
 moves = []
 player_token, empty_token, ai_token = 2, 1, 0
 lowest_in_column = [-1, -1, -1, -1, -1, -1, -1]
@@ -20,16 +20,15 @@ for i in range(height):
 for i in range(height):
     for j in range(width):
         board[i][j] = empty_token
-#last_place = [-1, -1]
 
 # Prints the board according to the example given (without the pieces):
-##  0 1 2 3 4 5 6
-## | | | | | | | |
-## | | | | | | | |
-## | |X|O| | | | |
-## | |O|X|X| | | |
-## | |O|X|O| | | |
-## |X|O|O|O|X| | |
+##   0 1 2 3 4 5 6
+## 0| | | | | | | |
+## 1| | | | | | | |
+## 2| |X|O| | | | |
+## 3| |O|X|X| | | |
+## 4| |O|X|O| | | |
+## 5|X|O|O|O|X| | |
 ## The spots in the board are converted using the ternary operation
 ## Why not just store the board like this? Because reasons.
 def printBoard():
@@ -76,7 +75,7 @@ def take_turn(is_player):
             if is_valid_drop(selection):
                 break
 
-        make_move(PVector(selection, lowest_in_column[selection], player_token))
+        make_move(selection, player_token)
         ## Done the player's turn
     else:
         # AI is supposed to be "Minimax", meaning it looks a certain distance in the future (board states) then chooses the best outcome.
@@ -91,7 +90,7 @@ def take_turn(is_player):
 
             ## Check that it works
             if is_valid_drop(selection):
-                make_move(PVector(selection, lowest_in_column[selection], ai_token))
+                make_move(selection, ai_token)
                 break
 
 # Refreshes the lowest known row per column for all columns
@@ -109,39 +108,18 @@ def refresh_lowest_at(column):
         if board[i][column] == empty_token:
             lowest_in_column[column] = i
 
-# Returns a value associated with the current board state on the token given
-# Current checks:
-# - Max length of "possible" straight
-#   - Connecting the dots, take the example board state: 
-#     0 1 2 3 4 5 6
-#    | | | | | | | |
-#    | | | | | | | |
-#    | | | | | | | |
-#    |0| | | | |X|X|
-#    |0| | | | |X|0|
-#    |X|X|X|0| |0|0|
-#   - Notice how both X and 0 can make pairs of 3 (simple max = 3)
-#   - But, 0 has the sightline to make a straight of 4 (sightline max = 4)
-#   - In both cases, we only check the 7 columns
+# Returns a list of each possible drop point and its respective score to the simple leads
 def score_board(token):
-    # Generate lowest possible points
+    # Generate lowest possible points (just in case)
     refresh_lowest_all()
 
-    # Check each of the points for each possible direction (not directly up)
-    ## Not really, all we are doing here are "simulating" (not even) a drop on how good each column is
-    best_col = -1
-    best_score = -1
+    # Search through all columns last empty node to see the potential score of adjacent pieces
+    col_score = [-1, -1, -1, -1, -1, -1, -1]
     for i in range(width):
-        #print("Searching col " + str(i) + " (" + str(lowest_in_column[i]) + ")")
-        col_score = score_col(token, lowest_in_column[i], i,  0, -1)
-        ## If the score of this column was the best, then set set the column used to as the best one
-        if col_score > best_score:
-            #print("col_score won with " + str(col_score) + " vs " + str(best_score) + ", making col " + str(i))
-            best_score = col_score
-            best_col = i
-    
-    print("Got best score of " + str(best_score) + " in " + str(best_col))
-    return best_col
+        col_score[i] = score_col(token, lowest_in_column[i], i,  0, -1)
+
+    #print("Got best score of " + str(best_score) + " in " + str(best_col))
+    return col_score
 
 # Looks around the current location for a given token. If it is, then it will proceed down that path.
 # Dir is used to avoid circles because I am bad a coding recursion
@@ -150,7 +128,7 @@ def score_board(token):
 ## [6] [5]  [4]
 # Desired expansions/TODO:
 #   - Make a 1 column, 1 time skip of a space
-#       - This means that the ai can connect a 1 missing
+#       - This means that the ai can connect a 1 missing space ([x] [x] [ ] [x])
 #       - Only matters if I get the ai to do some random-y stuff too, since it will blindly place pieces next to each other
 #   - Have the ai score itself vs the player. This would be in the minimax, but essentially compare the scores of both "placing best for me" and "placing worst for them"
 #       - Ideally, we would want both, so after we would want the program to "add" the scores up for finals
@@ -311,15 +289,17 @@ def test_score_player():
 ## A move is defined as the position and piece that was placed.
 ## The PVector object stores the location and piece data in a single object
 # This concept allows us to make and unmake moves easily for recursive tree searching
-def make_move(move):
+def make_move(column, token): # This is the one that should be used normally, letting the program take care of the row
+    refresh_lowest_at(column)
+    move = PVector(column, lowest_in_column[column], token)
     #print("Making move: x=" + str(move.x) + " y=" + str(move.y) + " data=" + str(move.data))
     moves.append(move)
     board[move.y][move.x] = move.data
 
-def unmake_move():
-    move = moves.pop()
-    board[move.y][move.x] = empty_token
+def make_move(move): # This is a debug move, made for forcefully setting a selected box to a token
+    moves.append(move)
+    board[move.y][move.x] = move.data
 
-def unmake_move(move):
-    moves.pop()
+def unmake_move(): # Undo-s the last move made
+    move = moves.pop()
     board[move.y][move.x] = empty_token
