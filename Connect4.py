@@ -9,7 +9,7 @@ while not game_over:
     ## Print the board every time so we can see what happened
     board.test_move()
     board.printBoard()
-    board.test_score_player()
+    print("Test scores: " + str(board.test_score_player()))
 
     ## Decide who goes when
     if player_turn:

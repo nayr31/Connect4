@@ -9,7 +9,7 @@ width, height = 7, 6
 top_string = "+ 0 1 2 3 4 5 6 "
 moves = []
 player_token, empty_token, ai_token = 2, 1, 0
-lowest_in_column = [-1, -1, -1, -1, -1, -1, -1]
+lowest_in_column = [5, 5, 5, 5, 5, 5, 5]
 
 # Board information and setup
 ## I ended up using a 1 for an empty space, 2 for a player space, and 0 for an AI space
@@ -95,27 +95,31 @@ def take_turn(is_player):
 
 # Refreshes the lowest known row per column for all columns
 def refresh_lowest_all():
-    lowest_in_column = [-1, -1, -1, -1, -1, -1, -1]
-    for i in range(height):
-        for j in range(width):
-            if board[i][j] == empty_token:
-                lowest_in_column[j] = i
+    for col in range(width):
+        refresh_lowest_at(col)
 
 # Refreshes the entry of the lowest row at a certain column
-def refresh_lowest_at(column):
-    lowest_in_column[column] = -1
-    for i in range(height):
-        if board[i][column] == empty_token:
-            lowest_in_column[column] = i
+def refresh_lowest_at(col):
+    #print("Refresh col=" + str(col))
+    for row in range(height):
+        if board[row][col] == empty_token:
+            lowest_in_column[col] = row
+        else:
+            #print("Broke at row=" + str(row))
+            break
+    #print("Finished entire column.")
 
 # Returns a list of each possible drop point and its respective score to the simple leads
 def score_board(token):
     # Generate lowest possible points (just in case)
-    refresh_lowest_all()
+    #refresh_lowest_all()
+    print(lowest_in_column)
 
     # Search through all columns last empty node to see the potential score of adjacent pieces
     col_score = [-1, -1, -1, -1, -1, -1, -1]
     for i in range(width):
+        refresh_lowest_at(i)
+        #print("Starting search in col " + str(i) + " for row " + str(lowest_in_column[i]))
         col_score[i] = score_col(token, lowest_in_column[i], i,  0, -1)
 
     #print("Got best score of " + str(best_score) + " in " + str(best_col))
@@ -127,48 +131,37 @@ def score_board(token):
 ## [7] [-1] [3]
 ## [6] [5]  [4]
 # Desired expansions/TODO:
-#   - Make a 1 column, 1 time skip of a space
-#       - This means that the ai can connect a 1 missing space ([x] [x] [ ] [x])
-#       - Only matters if I get the ai to do some random-y stuff too, since it will blindly place pieces next to each other
 #   - Have the ai score itself vs the player. This would be in the minimax, but essentially compare the scores of both "placing best for me" and "placing worst for them"
 #       - Ideally, we would want both, so after we would want the program to "add" the scores up for finals
 def score_col(token, row, column, length, dir):
     #print("Recursion data: [" + str(column) + ", " + str(row) + "], " + str(length) + (", root" if dir is -1 else ""))
     best_len = -1 # Best length of this column, overall score
-    t_score = -1 # We don't want to call the same recursive function multiple times lol
-    # First check simple max
+    
+    # Store the initial best score from each direction
+    best_score_in_dir = [-1, -1, -1, -1, -1, -1, -1]
+
     ## Left 3 (up-left, left, down-left)
     if column != 0:
         ## up-left
         if row - 1 >= 0:
             if dir == -1 or dir == 0:
                 if board[row - 1][column - 1] == token:
-                    t_score = score_col(token, row - 1, column - 1, length + 1, 0)
-                    if t_score > best_len:
-                        best_len = t_score
+                    best_score_in_dir[0] = score_col(token, row - 1, column - 1, length + 1, 0)
         ## left
         if dir == -1 or dir == 7:
             if board[row][column - 1] == token:
-                t_score = score_col(token, row, column - 1, length + 1, 7)
-                if t_score > best_len:
-                    best_len = t_score
+                best_score_in_dir[7] = score_col(token, row, column - 1, length + 1, 7)
         ## down-left
         if row + 1 < height:
             if dir == -1 or dir == 6:
                 if board[row + 1][column - 1] == token:
-                    t_score = score_col(token, row + 1, column - 1, length + 1, 6)
-                    if t_score > best_len:
-                        best_len = t_score
+                    best_score_in_dir[6] = score_col(token, row + 1, column - 1, length + 1, 6)
 
     ## down
     if row + 1 < height:
         if dir == -1 or dir == 5:
             if board[row + 1][column] == token:
-                t_score = score_col(token, row + 1, column, length + 1, 5)
-                #print("---Got Down of " + str(t_score) + " vs " + str(best_len) + ", length: " + str(length))
-                if t_score > best_len:
-                    best_len = t_score
-                #print("---Best is now " + str(best_len))
+                best_score_in_dir[5] = score_col(token, row + 1, column, length + 1, 5)
 
     ## Right 3 (right-down, right, right-up)
     if column != width-1:
@@ -176,25 +169,34 @@ def score_col(token, row, column, length, dir):
         if row + 1 < height:
             if dir == -1 or dir == 4:
                 if board[row + 1][column + 1] == token:
-                    t_score = score_col(token, row + 1, column + 1, length + 1, 4)
-                    if t_score > best_len:
-                        best_len = t_score
+                    best_score_in_dir[4] = score_col(token, row + 1, column + 1, length + 1, 4)
         ## right
         if dir == -1 or dir == 3:
             if board[row][column + 1] == token:
-                t_score = score_col(token, row, column + 1, length + 1, 3)
-                if t_score > best_len:
-                    best_len = t_score
+                best_score_in_dir[3] = score_col(token, row, column + 1, length + 1, 3)
         ## right-up
         if row - 1 >= 0:
             if dir == -1 or dir == 2:
                 if board[row - 1][column + 1] == token:
-                    t_score = score_col(token, row - 1, column + 1, length + 1, 2)
-                    if t_score > best_len:
-                        best_len = t_score
+                    best_score_in_dir[2] = score_col(token, row - 1, column + 1, length + 1, 2)
     #print("Got best_val of " + str(best_len) + " from " + str(length) + ", dir:" + str(dir))
+    
+    # Now we have the best score (common tokens) in each direction, although we want to bridge some as well
+    ## [0] = left-down (0 and 4)
+    ## [1] = straight right (7 and 3)
+    ## [2] = left-up (6 and 2)
+    ## [3] = down (down doesn't share a straight)
+    # If I set the initial values in the best_in_score_dir to 0, it might break something. Something to improve/investigate if performance is bad
+    best_in_common = [-1, -1, -1, best_score_in_dir[5]]
+    best_in_common[0] = (best_score_in_dir[0] if best_score_in_dir[0] is not -1 else 0) + (best_score_in_dir[4] if best_score_in_dir[4] is not -1 else 0)
+    best_in_common[1] = (best_score_in_dir[7] if best_score_in_dir[7] is not -1 else 0) + (best_score_in_dir[3] if best_score_in_dir[3] is not -1 else 0)
+    best_in_common[2] = (best_score_in_dir[6] if best_score_in_dir[6] is not -1 else 0) + (best_score_in_dir[2] if best_score_in_dir[2] is not -1 else 0)
+    
+
     if best_len < length:
+        #print("Got end case, BL=" + str(best_len) + ", L=" + str(length) + " at [" + str(column) + ", " + str(row) + "]")
         return length
+    #print("Skipped end case, BL=" + str(best_len) + ", L=" + str(length) + " at [" + str(column) + ", " + str(row) + "]")
     return best_len
 
 def check_for_four():
@@ -276,10 +278,11 @@ def val_at(point):
 
 # Test method; Sets selected coordinates to certain pieces [col, row, token_type]
 def test_move():
-    make_move(PVector(0, 4, player_token))
-    make_move(PVector(0, 5, player_token))
-    make_move(PVector(3, 5, player_token))
-    make_move(PVector(2, 5, ai_token))
+    make_move(0, player_token)
+    make_move(0, player_token)
+    make_move(0, player_token)
+    make_move(0, player_token)
+    make_move(1, player_token)
 
 # Test method; returns the current board score of the player [token_type]
 def test_score_player():
@@ -290,16 +293,21 @@ def test_score_player():
 ## The PVector object stores the location and piece data in a single object
 # This concept allows us to make and unmake moves easily for recursive tree searching
 def make_move(column, token): # This is the one that should be used normally, letting the program take care of the row
-    refresh_lowest_at(column)
     move = PVector(column, lowest_in_column[column], token)
     #print("Making move: x=" + str(move.x) + " y=" + str(move.y) + " data=" + str(move.data))
     moves.append(move)
     board[move.y][move.x] = move.data
+    refresh_lowest_at(column)
 
-def make_move(move): # This is a debug move, made for forcefully setting a selected box to a token
-    moves.append(move)
-    board[move.y][move.x] = move.data
+#def make_move(move): # This is a debug move, made for forcefully setting a selected box to a token
+#    moves.append(move)
+#    board[move.y][move.x] = move.data
 
 def unmake_move(): # Undo-s the last move made
     move = moves.pop()
     board[move.y][move.x] = empty_token
+    refresh_lowest_at(move.x)
+
+def restart():
+    moves.clear()
+    lowest_in_column
