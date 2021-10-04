@@ -34,9 +34,11 @@ for i in range(height):
 ## Why not just store the board like this? Because reasons.
 def printBoard():
     print(top_string)
+    imp = -1
     for row in board:
+        imp += 1
         ## Always starts empty ""
-        build_string = ""
+        build_string = str(imp)
         for spot in row:
             ## So that every iteration we put the left wall and its contents "|X"
             build_string += "|"
@@ -60,25 +62,10 @@ def is_valid_drop(column):
     ## Yes this could have just returned board[0][column] == 1, but I wanted error specific messages
     return True
 
-# Places a piece at the selected column, and assumes that it can (will throw an error if it can't, but that shouldn't happen)
-def place_piece(selection, token):
-    ## Got the selected column, need to find the lowest point
-    lowest_point = -1
-
-    ## Iterate through each of the 6 rows (i) and find the "lowest" box without a "1"
-    for i in range(height):
-        if board[i][selection] == empty_token:
-            lowest_point = i
-
-    ## Lowest point found, set the token
-    board[lowest_point][selection] = token
-    #last_place = [lowest_point, selection]
-    print("Dropped token into column [" + str(selection) + "]")
-
 # A stupidly named method, this actually is the "take turn" method
 # Basically depending on which turn it is the program will do whatever it needs to for that player
 # This allows the main runtime to choose how it wants to run the game, while this just takes care of the backend
-def dropPiece(is_player):
+def take_turn(is_player):
     selection = -1
 
     if is_player:
@@ -89,7 +76,7 @@ def dropPiece(is_player):
             if is_valid_drop(selection):
                 break
 
-        place_piece(selection, player_token)
+        make_move(PVector(selection, lowest_in_column[selection], player_token))
         ## Done the player's turn
     else:
         # AI is supposed to be "Minimax", meaning it looks a certain distance in the future (board states) then chooses the best outcome.
@@ -104,8 +91,23 @@ def dropPiece(is_player):
 
             ## Check that it works
             if is_valid_drop(selection):
-                place_piece(selection, ai_token)
+                make_move(PVector(selection, lowest_in_column[selection], ai_token))
                 break
+
+# Refreshes the lowest known row per column for all columns
+def refresh_lowest_all():
+    lowest_in_column = [-1, -1, -1, -1, -1, -1, -1]
+    for i in range(height):
+        for j in range(width):
+            if board[i][j] == empty_token:
+                lowest_in_column[j] = i
+
+# Refreshes the entry of the lowest row at a certain column
+def refresh_lowest_at(column):
+    lowest_in_column[column] = -1
+    for i in range(height):
+        if board[i][column] == empty_token:
+            lowest_in_column[column] = i
 
 # Returns a value associated with the current board state on the token given
 # Current checks:
@@ -123,27 +125,37 @@ def dropPiece(is_player):
 #   - In both cases, we only check the 7 columns
 def score_board(token):
     # Generate lowest possible points
-    lowest_in_column = [-1, -1, -1, -1, -1, -1, -1]
-    for i in range(height):
-        for j in range(width):
-            if board[i][j] == empty_token:
-                lowest_in_column[j] = i
-    
+    refresh_lowest_all()
+
     # Check each of the points for each possible direction (not directly up)
     ## Not really, all we are doing here are "simulating" (not even) a drop on how good each column is
     best_col = -1
     best_score = -1
     for i in range(width):
-        col_score = score_col(token, lowest_in_column[i], i,  0)
+        #print("Searching col " + str(i) + " (" + str(lowest_in_column[i]) + ")")
+        col_score = score_col(token, lowest_in_column[i], i,  0, -1)
         ## If the score of this column was the best, then set set the column used to as the best one
-        if col_score > best_col:
+        if col_score > best_score:
+            #print("col_score won with " + str(col_score) + " vs " + str(best_score) + ", making col " + str(i))
             best_score = col_score
             best_col = i
     
-    print("Got best score of " + str(best_score) + " in " + str(i))
-    return [best_col]
+    print("Got best score of " + str(best_score) + " in " + str(best_col))
+    return best_col
 
-def score_col(token, row, column, length):
+# Looks around the current location for a given token. If it is, then it will proceed down that path.
+# Dir is used to avoid circles because I am bad a coding recursion
+## [0] [1]  [2] (1 is unused)
+## [7] [-1] [3]
+## [6] [5]  [4]
+# Desired expansions/TODO:
+#   - Make a 1 column, 1 time skip of a space
+#       - This means that the ai can connect a 1 missing
+#       - Only matters if I get the ai to do some random-y stuff too, since it will blindly place pieces next to each other
+#   - Have the ai score itself vs the player. This would be in the minimax, but essentially compare the scores of both "placing best for me" and "placing worst for them"
+#       - Ideally, we would want both, so after we would want the program to "add" the scores up for finals
+def score_col(token, row, column, length, dir):
+    #print("Recursion data: [" + str(column) + ", " + str(row) + "], " + str(length) + (", root" if dir is -1 else ""))
     best_len = -1 # Best length of this column, overall score
     t_score = -1 # We don't want to call the same recursive function multiple times lol
     # First check simple max
@@ -151,49 +163,60 @@ def score_col(token, row, column, length):
     if column != 0:
         ## up-left
         if row - 1 >= 0:
-            if board[row - 1][column - 1] == token:
-                t_score = score_col(token, row - 1, column - 1, length + 1)
-                if t_score >= best_len:
-                    best_len = t_score
+            if dir == -1 or dir == 0:
+                if board[row - 1][column - 1] == token:
+                    t_score = score_col(token, row - 1, column - 1, length + 1, 0)
+                    if t_score > best_len:
+                        best_len = t_score
         ## left
-        if board[row][column - 1] == token:
-            t_score = score_col(token, row, column - 1, length + 1)
-            if t_score >= best_len:
-                best_len = t_score
+        if dir == -1 or dir == 7:
+            if board[row][column - 1] == token:
+                t_score = score_col(token, row, column - 1, length + 1, 7)
+                if t_score > best_len:
+                    best_len = t_score
         ## down-left
         if row + 1 < height:
-            if board[row + 1][column - 1] == token:
-                t_score = score_col(token, row + 1, column - 1, length + 1)
-                if t_score >= best_len:
-                    best_len = t_score
+            if dir == -1 or dir == 6:
+                if board[row + 1][column - 1] == token:
+                    t_score = score_col(token, row + 1, column - 1, length + 1, 6)
+                    if t_score > best_len:
+                        best_len = t_score
 
     ## down
     if row + 1 < height:
-        if board[row + 1][column] == token:
-            t_score = score_col(token, row + 1, column, length + 1)
-            if t_score >= best_len:
-                best_len = t_score
+        if dir == -1 or dir == 5:
+            if board[row + 1][column] == token:
+                t_score = score_col(token, row + 1, column, length + 1, 5)
+                #print("---Got Down of " + str(t_score) + " vs " + str(best_len) + ", length: " + str(length))
+                if t_score > best_len:
+                    best_len = t_score
+                #print("---Best is now " + str(best_len))
 
     ## Right 3 (right-down, right, right-up)
     if column != width-1:
         ## right-down
         if row + 1 < height:
-            if board[row + 1][column + 1] == token:
-                t_score = score_col(token, row + 1, column + 1, length + 1)
-                if t_score >= best_len:
-                    best_len = t_score
+            if dir == -1 or dir == 4:
+                if board[row + 1][column + 1] == token:
+                    t_score = score_col(token, row + 1, column + 1, length + 1, 4)
+                    if t_score > best_len:
+                        best_len = t_score
         ## right
-        if board[row][column + 1] == token:
-            t_score = score_col(token, row + 1, column + 1, length + 1)
-            if t_score >= best_len:
-                best_len = t_score
+        if dir == -1 or dir == 3:
+            if board[row][column + 1] == token:
+                t_score = score_col(token, row, column + 1, length + 1, 3)
+                if t_score > best_len:
+                    best_len = t_score
         ## right-up
         if row - 1 >= 0:
-            if board[row - 1][column + 1] == token:
-                t_score = score_col(token, row + 1, column + 1, length + 1)
-                if t_score >= best_len:
-                    best_len = t_score
-    ##TODO This returns the wrong value?
+            if dir == -1 or dir == 2:
+                if board[row - 1][column + 1] == token:
+                    t_score = score_col(token, row - 1, column + 1, length + 1, 2)
+                    if t_score > best_len:
+                        best_len = t_score
+    #print("Got best_val of " + str(best_len) + " from " + str(length) + ", dir:" + str(dir))
+    if best_len < length:
+        return length
     return best_len
 
 def check_for_four():
@@ -273,12 +296,14 @@ def check_for_four():
 def val_at(point):
     return board[point[0], point[1]]
 
-# Test method; Sets selected coordinates to whatever you might need
+# Test method; Sets selected coordinates to certain pieces [col, row, token_type]
 def test_move():
-    make_move(PVector(0, 5, player_token))
     make_move(PVector(0, 4, player_token))
+    make_move(PVector(0, 5, player_token))
+    make_move(PVector(3, 5, player_token))
+    make_move(PVector(2, 5, ai_token))
 
-# Test method; returns the current board score of the player
+# Test method; returns the current board score of the player [token_type]
 def test_score_player():
     return score_board(player_token)
 
