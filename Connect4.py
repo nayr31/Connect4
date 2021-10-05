@@ -19,7 +19,7 @@ while not game_over:
         print("AI Turn.")
         board.take_turn(False)
     
-    ## Piece dropped, check for a winner
+    # Piece dropped, check for a winner
     # This process is a mess and could be improved
     received_point = board.check_for_four()
     if received_point == [-99, -99]:

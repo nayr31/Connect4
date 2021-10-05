@@ -79,9 +79,6 @@ def take_turn(is_player):
         ## Done the player's turn
     else:
         # AI is supposed to be "Minimax", meaning it looks a certain distance in the future (board states) then chooses the best outcome.
-        # Alpha-beta pruning should be used to determine b-tree outcomes that just don't look great and we can ignore.
-        #   This will speed up the program by looking at less possibilities, while also reducing memory usage by storing less values.
-        #   Maybe higher winning odds as well?
         print("Beep bop, I am a robot.")
 
         while True:
@@ -100,29 +97,59 @@ def refresh_lowest_all():
 
 # Refreshes the entry of the lowest row at a certain column
 def refresh_lowest_at(col):
-    #print("Refresh col=" + str(col))
+    lowest_in_column[col] = -1
     for row in range(height):
         if board[row][col] == empty_token:
             lowest_in_column[col] = row
         else:
-            #print("Broke at row=" + str(row))
             break
-    #print("Finished entire column.")
+
+# This method compares both "how would it benifit me?" and "how would it hurt you?"
+# Returns a list of column scores
+## Meant to be used on the ai turn "if it is my turn, where should I go?"
+def score_vs():
+    # Score board returns a list which scores each "beneficial" drop on the column
+    # Get the benefits of both ai and player tokens, if it benefits you, it benefits me more
+    my_score = score_board(ai_token)
+    your_score = score_board(player_token)
+
+    # First of all, we want to stop the player from winning at all costs
+    for col in range(len(your_score)):
+        if your_score[col] == 3:
+            your_score[col] = 99
+        if my_score[col] == 3: # But of course, if we can win instead we should do that
+            my_score = 100
+    
+    # Now we have weighted scores of both "good for me" and "bad for you"
+    # So we take the max of both and combine them into a single list
+    comb_list = [-1, -1, -1, -1, -1, -1, -1]
+    for col in range(len(my_score)):
+        # Set the value in the combined list to the larger of the two list entries
+        # Since we use `>`, this should prioritize blocking the player
+        comb_list[col] = my_score if my_score > your_score else your_score
+        # If we have a situation where there is only 1 player token, or equal maximum scores, then we should pick something random
+        # I will omit this for now, as it will add more processing time
+        # The player min should preform this though
+    
+    # Resulting comb_list has the combined maximums of both list, giving the highest priority score
+    # Find the maximum score of this list
+    best = [-1, -1] # This object just stores the best value and the column it was found
+    for col in range(len(comb_list)):
+        if comb_list[col] > best[0]:
+            best = [comb_list[col], col]
+    
+    return best
 
 # Returns a list of each possible drop point and its respective score to the simple leads
 def score_board(token):
-    # Generate lowest possible points (just in case)
-    #refresh_lowest_all()
-    print(lowest_in_column)
-
     # Search through all columns last empty node to see the potential score of adjacent pieces
     col_score = [-1, -1, -1, -1, -1, -1, -1]
     for i in range(width):
+        # Make sure we only score the non-filled columns
         refresh_lowest_at(i)
-        #print("Starting search in col " + str(i) + " for row " + str(lowest_in_column[i]))
-        col_score[i] = score_col(token, lowest_in_column[i], i,  0, -1)
+        if lowest_in_column[i] != -1:
+            col_score[i] = score_col(token, lowest_in_column[i], i,  0, -1)
 
-    #print("Got best score of " + str(best_score) + " in " + str(best_col))
     return col_score
 
 # Looks around the current location for a given token. If it is, then it will proceed down that path.
@@ -130,15 +157,9 @@ def score_board(token):
 ## [0] [1]  [2] (1 is unused)
 ## [7] [-1] [3]
 ## [6] [5]  [4]
-# Desired expansions/TODO:
-#   - Have the ai score itself vs the player. This would be in the minimax, but essentially compare the scores of both "placing best for me" and "placing worst for them"
-#       - Ideally, we would want both, so after we would want the program to "add" the scores up for finals
 def score_col(token, row, column, length, dir):
-    #print("Recursion data: [" + str(column) + ", " + str(row) + "], " + str(length) + (", root" if dir is -1 else ""))
-    best_len = -1 # Best length of this column, overall score
-    
     # Store the initial best score from each direction
-    best_score_in_dir = [-1, -1, -1, -1, -1, -1, -1]
+    best_score_in_dir = [-1, -1, -1, -1, -1, -1, -1, -1]
 
     ## Left 3 (up-left, left, down-left)
     if column != 0:
@@ -179,24 +200,40 @@ def score_col(token, row, column, length, dir):
             if dir == -1 or dir == 2:
                 if board[row - 1][column + 1] == token:
                     best_score_in_dir[2] = score_col(token, row - 1, column + 1, length + 1, 2)
-    #print("Got best_val of " + str(best_len) + " from " + str(length) + ", dir:" + str(dir))
     
+    best_len = -1 # Best length of this column, overall score
+
     # Now we have the best score (common tokens) in each direction, although we want to bridge some as well
     ## [0] = left-down (0 and 4)
     ## [1] = straight right (7 and 3)
     ## [2] = left-up (6 and 2)
     ## [3] = down (down doesn't share a straight)
     # If I set the initial values in the best_in_score_dir to 0, it might break something. Something to improve/investigate if performance is bad
-    best_in_common = [-1, -1, -1, best_score_in_dir[5]]
-    best_in_common[0] = (best_score_in_dir[0] if best_score_in_dir[0] is not -1 else 0) + (best_score_in_dir[4] if best_score_in_dir[4] is not -1 else 0)
-    best_in_common[1] = (best_score_in_dir[7] if best_score_in_dir[7] is not -1 else 0) + (best_score_in_dir[3] if best_score_in_dir[3] is not -1 else 0)
-    best_in_common[2] = (best_score_in_dir[6] if best_score_in_dir[6] is not -1 else 0) + (best_score_in_dir[2] if best_score_in_dir[2] is not -1 else 0)
-    
+    if dir == -1: # This step should only be preformed during the last
+        
+        best_in_common = [-1, -1, -1, best_score_in_dir[5]]
+        best_in_common[0] = (best_score_in_dir[0] if best_score_in_dir[0] != -1 else 0) + (best_score_in_dir[4] if best_score_in_dir[4] != -1 else 0)
+        best_in_common[1] = (best_score_in_dir[7] if best_score_in_dir[7] != -1 else 0) + (best_score_in_dir[3] if best_score_in_dir[3] != -1 else 0)
+        best_in_common[2] = (best_score_in_dir[6] if best_score_in_dir[6] != -1 else 0) + (best_score_in_dir[2] if best_score_in_dir[2] != -1 else 0)
 
+        # Iterate through the now scored directions for the best one
+        for i in range(4):
+            if best_in_common[i] > best_len:
+                best_len = best_in_common[i]
+
+        print("At root node return. BL=" + str(best_len) + " " + str(best_in_common))
+        return best_len
+
+    # Otherwise, we are at a recursion node
+    # Since we are at a node, we need to return our best found length
+    for i in range(8):
+        if best_score_in_dir[i] > best_len:
+            best_len = best_score_in_dir[i]
+
+    # If we didn't get any hits on the 
     if best_len < length:
-        #print("Got end case, BL=" + str(best_len) + ", L=" + str(length) + " at [" + str(column) + ", " + str(row) + "]")
         return length
-    #print("Skipped end case, BL=" + str(best_len) + ", L=" + str(length) + " at [" + str(column) + ", " + str(row) + "]")
+    # This line should only run if we are at a node, but have run branches past this.
     return best_len
 
 def check_for_four():
@@ -282,7 +319,11 @@ def test_move():
     make_move(0, player_token)
     make_move(0, player_token)
     make_move(0, player_token)
+    make_move(0, player_token)
+    make_move(0, player_token)
     make_move(1, player_token)
+    make_move(2, player_token)
+    make_move(3, ai_token)
 
 # Test method; returns the current board score of the player [token_type]
 def test_score_player():
@@ -299,15 +340,11 @@ def make_move(column, token): # This is the one that should be used normally, le
     board[move.y][move.x] = move.data
     refresh_lowest_at(column)
 
-#def make_move(move): # This is a debug move, made for forcefully setting a selected box to a token
-#    moves.append(move)
-#    board[move.y][move.x] = move.data
-
-def unmake_move(): # Undo-s the last move made
+def undo_move(): # Undo-s the last move made
     move = moves.pop()
     board[move.y][move.x] = empty_token
     refresh_lowest_at(move.x)
 
-def restart():
-    moves.clear()
-    lowest_in_column
+def unmake_move(move): # Reverts a certain move to an empty state
+    board[move.y][move.x] = empty_token
+    refresh_lowest_at(move.x)
