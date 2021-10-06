@@ -7,9 +7,11 @@ import random
 # Constants
 width, height = 7, 6
 top_string = "+ 0 1 2 3 4 5 6 "
-moves = []
 player_token, empty_token, ai_token = 2, 1, 0
 lowest_in_column = [5, 5, 5, 5, 5, 5, 5]
+player_turn = False
+game_over = False
+moves = []
 
 # Board information and setup
 ## I ended up using a 1 for an empty space, 2 for a player space, and 0 for an AI space
@@ -104,41 +106,81 @@ def refresh_lowest_at(col):
         else:
             break
 
-# This method compares both "how would it benifit me?" and "how would it hurt you?"
-# Returns a list of column scores
-## Meant to be used on the ai turn "if it is my turn, where should I go?"
-def score_vs():
-    # Score board returns a list which scores each "beneficial" drop on the column
-    # Get the benefits of both ai and player tokens, if it benefits you, it benefits me more
-    my_score = score_board(ai_token)
-    your_score = score_board(player_token)
+def see_the_future():
+    return minimax(6)
 
-    # First of all, we want to stop the player from winning at all costs
-    for col in range(len(your_score)):
-        if your_score[col] == 3:
-            your_score[col] = 99
-        if my_score[col] == 3: # But of course, if we can win instead we should do that
-            my_score = 100
+def minimax(depth):
+    # Base condition, evaluate the final board state
+    if depth == 0:
+        return eval()
     
-    # Now we have weighted scores of both "good for me" and "bad for you"
-    # So we take the max of both and combine them into a single list
-    comb_list = [-1, -1, -1, -1, -1, -1, -1]
-    for col in range(len(my_score)):
-        # Set the value in the combined list to the larger of the two list entries
-        # Since we use `>`, this should prioritize blocking the player
-        comb_list[col] = my_score if my_score > your_score else your_score
-        # If we have a situation where there is only 1 player token, or equal maximum scores, then we should pick something random
-        # I will omit this for now, as it will add more processing time
-        # The player min should preform this though
+    # Check for valid columns
+    valid = valid_cols()
+    if len(valid) == 0: # Full board
+        # [-99, -99] is a tie, no winner
+        if check_for_four() == [-99, -99]:
+            return 0
+        # This means that someone won, making this a bad move
+        elif not valid == [-1, -1]:
+            return -999999
+        # [-1, -1] should never happen if the board isn't full, but just in case
+        return 0
     
-    # Resulting comb_list has the combined maximums of both list, giving the highest priority score
-    # Find the maximum score of this list
-    best = [-1, -1] # This object just stores the best value and the column it was found
-    for col in range(len(comb_list)):
-        if comb_list[col] > best[0]:
-            best = [comb_list[col], col]
+    # Board is not full, run through each valid column to get the highest score
+    best_eval = -999999
+
+    for col in range(len(valid)):
+        # Make a possible move
+        make_move(col, player_token if player_turn else ai_token)
+        # Grab the value of the next deeper board state (negative because other player turn)
+        test_eval = -minimax(depth - 1)
+        # If it is bigger (better) then we store that score
+        best_eval = test_eval if test_eval > best_eval else best_eval
+        # Unmake the move
+        undo_move()
+
+    return best_eval
+
+# Returns a list of the indexes of valid droppable columns
+def valid_cols():
+    valid = []
+    for col in range(len(lowest_in_column)):
+        if lowest_in_column[col] != -1:
+            valid.append(col)
+    
+    return valid
+
+# Evaluates the board state into a score
+# Does this by grabbing the normalized best column score of each player
+#   Then subtracts the player from the ai to get a difference
+#   Multiples the result by which turn it is
+def eval():
+    my_score = best_in_score(ai_token)
+    your_score = best_in_score(player_token)
+    eval_score = my_score - your_score
+    perspective = 1 if player_turn else -1
+    return eval_score * perspective
+
+# Returns the best value in a normalized list of scores
+def best_in_score(token):
+    score = score_board(token)
+    best = -1
+    for col in range(len(score)):
+        if score[col] > best:
+            best = score[col]
     
     return best
+
+# Normalizes the score of each straight (ie. 4 is super bad)
+def score_normalize(token):
+    score = score_board(token)
+
+    # Any player that gets a 4 in a row is super good for them
+    for col in range(len(score)):
+        if score[col] == 4: 
+            score[col] = 100
+    
+    return score
 
 # Returns a list of each possible drop point and its respective score to the simple leads
 def score_board(token):
@@ -221,7 +263,7 @@ def score_col(token, row, column, length, dir):
             if best_in_common[i] > best_len:
                 best_len = best_in_common[i]
 
-        print("At root node return. BL=" + str(best_len) + " " + str(best_in_common))
+        #print("At root node return. BL=" + str(best_len) + " " + str(best_in_common))
         return best_len
 
     # Otherwise, we are at a recursion node
@@ -316,14 +358,6 @@ def val_at(point):
 # Test method; Sets selected coordinates to certain pieces [col, row, token_type]
 def test_move():
     make_move(0, player_token)
-    make_move(0, player_token)
-    make_move(0, player_token)
-    make_move(0, player_token)
-    make_move(0, player_token)
-    make_move(0, player_token)
-    make_move(1, player_token)
-    make_move(2, player_token)
-    make_move(3, ai_token)
 
 # Test method; returns the current board score of the player [token_type]
 def test_score_player():
@@ -335,9 +369,13 @@ def test_score_player():
 # This concept allows us to make and unmake moves easily for recursive tree searching
 def make_move(column, token): # This is the one that should be used normally, letting the program take care of the row
     move = PVector(column, lowest_in_column[column], token)
-    #print("Making move: x=" + str(move.x) + " y=" + str(move.y) + " data=" + str(move.data))
     moves.append(move)
     board[move.y][move.x] = move.data
+    refresh_lowest_at(column)
+
+def predict_move(column, token):
+    move = PVector(column, lowest_in_column[column], token)
+    board[move.y][move.x] = token
     refresh_lowest_at(column)
 
 def undo_move(): # Undo-s the last move made

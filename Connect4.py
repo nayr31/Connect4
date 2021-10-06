@@ -1,18 +1,15 @@
 import BoardManip as board
 
-# Game vars, these determine when the game ends and who plays when
-game_over = False
-player_turn = True
-
 ## Main game loop
-while not game_over:
+while not board.game_over:
     ## Print the board every time so we can see what happened
-    board.test_move()
+    #board.test_move()
     board.printBoard()
-    print("Test scores: " + str(board.test_score_player()))
+    #print("Test scores: " + str(board.test_score_player()))
+    print("Get minimax: " + str(board.see_the_future()))
 
     ## Decide who goes when
-    if player_turn:
+    if board.player_turn:
         print("Player turn.")
         board.take_turn(True)
     else:
@@ -34,7 +31,7 @@ while not game_over:
         game_over = True
 
     ## No winner, toggle turn
-    player_turn = not player_turn
+    board.player_turn = not board.player_turn
 
 print("\nGame Over.")
 
