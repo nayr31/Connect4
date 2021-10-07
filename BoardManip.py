@@ -2,14 +2,13 @@
 # This could just be my Java seeping into my Python, but this is how I like it.
 
 from PVector import PVector
-import random
 
 # Constants
 width, height = 7, 6
 top_string = "+ 0 1 2 3 4 5 6 "
 player_token, empty_token, ai_token = 2, 1, 0
 lowest_in_column = [5, 5, 5, 5, 5, 5, 5]
-player_turn = False
+player_turn = True
 game_over = False
 moves = []
 
@@ -24,7 +23,7 @@ for i in range(height):
         board[i][j] = empty_token
 
 # Prints the board according to the example given (without the pieces):
-##   0 1 2 3 4 5 6
+## + 0 1 2 3 4 5 6
 ## 0| | | | | | | |
 ## 1| | | | | | | |
 ## 2| |X|O| | | | |
@@ -40,14 +39,19 @@ def printBoard():
         imp += 1
         ## Always starts empty ""
         build_string = str(imp)
+        debug_string = "-"
         for spot in row:
             ## So that every iteration we put the left wall and its contents "|X"
             build_string += "|"
+            debug_string += "|"
             #print("Checking spot: " + str(spot))
             build_string +=  "X" if str(spot) == str(player_token) else " " if str(spot) == str(empty_token) else "0"
+            debug_string += str(spot)
         ## Ending with the capstone "|X|O|""
         build_string += "|"
+        debug_string += "|"
         print(build_string)
+        print(debug_string)
 
 # Confirms that there is an open space at the top of the board. If there is, then it can't be full.
 def is_valid_drop(column):
@@ -83,14 +87,14 @@ def take_turn(is_player):
         # AI is supposed to be "Minimax", meaning it looks a certain distance in the future (board states) then chooses the best outcome.
         print("Beep bop, I am a robot.")
 
-        while True:
-            ## Look for a suitable column
-            selection = random.randint(0,6)
-
-            ## Check that it works
-            if is_valid_drop(selection):
-                make_move(selection, ai_token)
-                break
+        val = see_the_future(4)
+        print("I've seen the future: " + str(val))
+        make_move(val[1], ai_token)
+    
+    #s = ""
+    #for move in moves:
+    #    s = s + str(move.x) + "," + str(move.y) + ":" + str(move.data) + " "
+    #print(s)
 
 # Refreshes the lowest known row per column for all columns
 def refresh_lowest_all():
@@ -106,8 +110,8 @@ def refresh_lowest_at(col):
         else:
             break
 
-def see_the_future():
-    return minimax(6)
+def see_the_future(depth):
+    return minimax(depth)
 
 def minimax(depth):
     # Base condition, evaluate the final board state
@@ -127,17 +131,24 @@ def minimax(depth):
         return 0
     
     # Board is not full, run through each valid column to get the highest score
-    best_eval = -999999
+    best_eval = [-999999, -999999]
 
     for col in range(len(valid)):
         # Make a possible move
-        make_move(col, player_token if player_turn else ai_token)
-        # Grab the value of the next deeper board state (negative because other player turn)
-        test_eval = -minimax(depth - 1)
-        # If it is bigger (better) then we store that score
-        best_eval = test_eval if test_eval > best_eval else best_eval
+        global player_turn
+        move = predict_move(col, player_token if player_turn else ai_token)
+        # Grab the value of the next deeper board state from the other player's turn
+        player_turn = not player_turn
+        test_eval = minimax(depth - 1)
+        player_turn = not player_turn # Make sure to reset it back to our instace's turn
+        test_eval[0] *= -1 # Negative because it would be the other turn always
+        # If it is bigger (better) then we store that score and column
+        if test_eval[0] > best_eval[0]:
+            best_eval[0] = test_eval[0]
+            best_eval[1] = test_eval[1]
+        #best_eval[0] = test_eval[0] if test_eval[0] > best_eval[0] else best_eval[0]
         # Unmake the move
-        undo_move()
+        unmake_move(move)
 
     return best_eval
 
@@ -155,32 +166,28 @@ def valid_cols():
 #   Then subtracts the player from the ai to get a difference
 #   Multiples the result by which turn it is
 def eval():
+    # Retreive both best scores (straights)
     my_score = best_in_score(ai_token)
     your_score = best_in_score(player_token)
-    eval_score = my_score - your_score
+    # Get the difference, this will give + if good for us
+    eval_score = my_score[0] - your_score[0]
+    # But if it is the player's turn, we want the opposite of that value
     perspective = 1 if player_turn else -1
-    return eval_score * perspective
+    # Return that perspective score and the column that it was found at
+    ## The second bit that is returned is the column it was found
+    return [eval_score * perspective, my_score[1] if eval_score >= 0 else your_score[1]]
 
-# Returns the best value in a normalized list of scores
+# Returns the best value in a list of columns, also returning the column it was found at
 def best_in_score(token):
     score = score_board(token)
-    best = -1
+    best_val = -1
+    best_col = -1
     for col in range(len(score)):
-        if score[col] > best:
-            best = score[col]
+        if score[col] > best_val:
+            best_val = score[col]
+            best_col = col
     
-    return best
-
-# Normalizes the score of each straight (ie. 4 is super bad)
-def score_normalize(token):
-    score = score_board(token)
-
-    # Any player that gets a 4 in a row is super good for them
-    for col in range(len(score)):
-        if score[col] == 4: 
-            score[col] = 100
-    
-    return score
+    return [best_val, best_col]
 
 # Returns a list of each possible drop point and its respective score to the simple leads
 def score_board(token):
@@ -353,11 +360,7 @@ def check_for_four():
 
 # Returns the value on the board when given a point (list of two numbers)
 def val_at(point):
-    return board[point[0], point[1]]
-
-# Test method; Sets selected coordinates to certain pieces [col, row, token_type]
-def test_move():
-    make_move(0, player_token)
+    return board[point[0]][point[1]]
 
 # Test method; returns the current board score of the player [token_type]
 def test_score_player():
@@ -372,11 +375,13 @@ def make_move(column, token): # This is the one that should be used normally, le
     moves.append(move)
     board[move.y][move.x] = move.data
     refresh_lowest_at(column)
+    return move
 
 def predict_move(column, token):
     move = PVector(column, lowest_in_column[column], token)
     board[move.y][move.x] = token
     refresh_lowest_at(column)
+    return move
 
 def undo_move(): # Undo-s the last move made
     move = moves.pop()

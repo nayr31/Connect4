@@ -5,3 +5,7 @@ class PVector:
         self.x = x
         self.y = y
         self.data = data
+    
+    def __str__(self):
+        s = str(self.x) + "," + str(self.y) + ":" + str(self.data)
+        return s
