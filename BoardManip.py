@@ -2,6 +2,7 @@
 # This could just be my Java seeping into my Python, but this is how I like it.
 
 from PVector import PVector
+import random
 
 # Constants
 width, height = 7, 6
@@ -11,6 +12,7 @@ lowest_in_column = [5, 5, 5, 5, 5, 5, 5]
 player_turn = True
 game_over = False
 moves = []
+brain_depth = 1
 
 # Board information and setup
 ## I ended up using a 1 for an empty space, 2 for a player space, and 0 for an AI space
@@ -77,7 +79,7 @@ def take_ai_turn():
     # This value comes back in the form of a list:
     #   [value, column]
     # Where `value` is the value returned during the algorithm, and column is the column that it thinks it should use
-    val = minimax(1)
+    val = minimax(brain_depth)
     print("I've seen the future: " + str(val))
     # Make the move, which should already have the valid column done already
     make_move(val[1], ai_token)
@@ -136,9 +138,12 @@ def minimax(depth):
         # [-1, -1] should never happen if the board isn't full, but just in case
         return [0, 0]
     
-    # Board is not full, run through each valid column to get the highest score
-    best_eval = [-999999, -999999]
+    # These values keep track of the best of the best
+    best_eval = [-999999, -999999] # Temp best single
+    best_list = [] # Bet of all equal column scores
+    # The reason for these is because otherwise the ai would prefer filling leftmost columns
 
+    # Board is not full, run through each valid column to get the highest score
     for i in range(len(valid)):
         # Make a possible move
         global player_turn # I dont know why it needs this, as there is on
@@ -148,14 +153,25 @@ def minimax(depth):
         test_eval = minimax(depth - 1)
         player_turn = not player_turn # Make sure to reset it back to our instace's turn
         test_eval[0] *= -1 # Negative because it would be the other turn always
-        # If it is bigger (better) then we store that score and column
-        if test_eval[0] > best_eval[0]:
+        # If the value we tested is the same as the best we currently have, then we store that one as well
+        if test_eval[0] == best_eval[0]:
+            best_list.append(test_eval)
+        # If it isn't equal, but is instead larger, then we clear the list and add the new value
+        elif test_eval[0] > best_eval[0]:
+            best_list.clear()
+            best_list.append(test_eval)
+            # Not sure if I need to deep copy here or not, so I did it anyway
             best_eval[0] = test_eval[0]
             best_eval[1] = test_eval[1]
         # Unmake the move
         unmake_move(move)
 
-    return best_eval
+    # Now we have a list of the best columns
+    if len(best_list) == 1: # If there was a clear winner, return it
+        return best_eval
+    else:
+        # Get a random entry from the list and return it
+        return best_list[random.randint(0, len(best_list) - 1)]
 
 # Returns a list of the indexes of valid droppable columns
 def valid_cols():
@@ -399,3 +415,17 @@ def unmake_move(move): # Reverts a certain move to an empty state
     #print("Unmaking " + str(move))
     board[move.y][move.x] = empty_token
     refresh_lowest_at(move.x)
+
+# Gets the desired depth of the minimax from the user
+def get_depth():
+    # Keep pinging for a response in case they enter something invalid
+    while True:
+        try:
+            dep = input("Please enter the depth of minimax: ") # Get the input
+            if int(dep) >= 0: # Argue if it is a number, and its above -1
+                break
+            print("Cannot be negative")
+        except: # If it wasn't a number, they need to try again
+            print("Please enter a number.")
+    global brain_depth
+    brain_depth = int(dep)

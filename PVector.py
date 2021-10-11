@@ -7,5 +7,5 @@ class PVector:
         self.data = data
     
     def __str__(self):
-        s = str(self.x) + "," + str(self.y) + ":" + str(self.data)
+        s = "[" + str(self.x) + "," + str(self.y) + "]:" + ("X" if self.data == 2 else "0")
         return s
