@@ -51,7 +51,7 @@ def printBoard():
         build_string += "|"
         debug_string += "|"
         print(build_string)
-        print(debug_string)
+        #print(debug_string)
 
 # Confirms that there is an open space at the top of the board. If there is, then it can't be full.
 def is_valid_drop(column):
@@ -87,7 +87,7 @@ def take_turn(is_player):
         # AI is supposed to be "Minimax", meaning it looks a certain distance in the future (board states) then chooses the best outcome.
         print("Beep bop, I am a robot.")
 
-        val = see_the_future(4)
+        val = see_the_future(1)
         print("I've seen the future: " + str(val))
         make_move(val[1], ai_token)
     
@@ -121,22 +121,23 @@ def minimax(depth):
     # Check for valid columns
     valid = valid_cols()
     if len(valid) == 0: # Full board
+        four_check = check_for_four()
         # [-99, -99] is a tie, no winner
-        if check_for_four() == [-99, -99]:
-            return 0
+        if four_check == [-99, -99]:
+            return [0, 0]
         # This means that someone won, making this a bad move
-        elif not valid == [-1, -1]:
-            return -999999
+        elif not four_check == [-1, -1]:
+            return [-999999, 0]
         # [-1, -1] should never happen if the board isn't full, but just in case
-        return 0
+        return [0, 0]
     
     # Board is not full, run through each valid column to get the highest score
     best_eval = [-999999, -999999]
 
-    for col in range(len(valid)):
+    for i in range(len(valid)):
         # Make a possible move
-        global player_turn
-        move = predict_move(col, player_token if player_turn else ai_token)
+        global player_turn # I dont know why it needs this, as there is on
+        move = predict_move(valid[i], player_token if player_turn else ai_token)
         # Grab the value of the next deeper board state from the other player's turn
         player_turn = not player_turn
         test_eval = minimax(depth - 1)
@@ -146,7 +147,6 @@ def minimax(depth):
         if test_eval[0] > best_eval[0]:
             best_eval[0] = test_eval[0]
             best_eval[1] = test_eval[1]
-        #best_eval[0] = test_eval[0] if test_eval[0] > best_eval[0] else best_eval[0]
         # Unmake the move
         unmake_move(move)
 
@@ -172,6 +172,7 @@ def eval():
     # Get the difference, this will give + if good for us
     eval_score = my_score[0] - your_score[0]
     # But if it is the player's turn, we want the opposite of that value
+    global player_turn
     perspective = 1 if player_turn else -1
     # Return that perspective score and the column that it was found at
     ## The second bit that is returned is the column it was found
@@ -381,6 +382,7 @@ def predict_move(column, token):
     move = PVector(column, lowest_in_column[column], token)
     board[move.y][move.x] = token
     refresh_lowest_at(column)
+    #print("Pridict " + str(move))
     return move
 
 def undo_move(): # Undo-s the last move made
@@ -389,5 +391,6 @@ def undo_move(): # Undo-s the last move made
     refresh_lowest_at(move.x)
 
 def unmake_move(move): # Reverts a certain move to an empty state
+    #print("Unmaking " + str(move))
     board[move.y][move.x] = empty_token
     refresh_lowest_at(move.x)
