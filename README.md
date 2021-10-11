@@ -4,6 +4,8 @@ This project aims to create the game "Connect 4", adding an AI as the opponent u
 
 Made and tested with [Python 3.9.6](https://www.python.org/downloads/release/python-396/) in [VSCode](https://code.visualstudio.com).
 
+You can find the link to the [GitHub repo here](https://github.com/nayr31/Connect4), if you found this project otherwise.
+
 ## Usage
 
 Make sure you have the entire project extracted from the `.zip` you downloaded it from before continuing.
