@@ -39,19 +39,14 @@ def printBoard():
         imp += 1
         ## Always starts empty ""
         build_string = str(imp)
-        debug_string = "-"
         for spot in row:
             ## So that every iteration we put the left wall and its contents "|X"
             build_string += "|"
-            debug_string += "|"
             #print("Checking spot: " + str(spot))
             build_string +=  "X" if str(spot) == str(player_token) else " " if str(spot) == str(empty_token) else "0"
-            debug_string += str(spot)
         ## Ending with the capstone "|X|O|""
         build_string += "|"
-        debug_string += "|"
         print(build_string)
-        #print(debug_string)
 
 # Confirms that there is an open space at the top of the board. If there is, then it can't be full.
 def is_valid_drop(column):
@@ -67,34 +62,47 @@ def is_valid_drop(column):
     ## Yes this could have just returned board[0][column] == 1, but I wanted error specific messages
     return True
 
-# A stupidly named method, this actually is the "take turn" method
-# Basically depending on which turn it is the program will do whatever it needs to for that player
-# This allows the main runtime to choose how it wants to run the game, while this just takes care of the backend
-def take_turn(is_player):
+def take_player_turn():
     selection = -1
+    ## Get the column the player wants to drop into, making sure its valid
+    while True:
+        # Error handling is handled inside of the is_valid method
+        selection = int(input("Which column to drop into?: "))
+        if is_valid_drop(selection): # Once we get a selection that is a valid drop, we can continue and make the move
+            break
+    make_move(selection, player_token)
 
-    if is_player:
-        ## Get the column the player wants to drop into, making sure its valid
-        while True:
-            # Error handling is handled inside of the is_valid method
-            selection = int(input("Which column to drop into?: "))
-            if is_valid_drop(selection):
-                break
+def take_ai_turn():
+    # Get the predicted value from the minimax
+    # This value comes back in the form of a list:
+    #   [value, column]
+    # Where `value` is the value returned during the algorithm, and column is the column that it thinks it should use
+    val = minimax(1)
+    print("I've seen the future: " + str(val))
+    # Make the move, which should already have the valid column done already
+    make_move(val[1], ai_token)
 
-        make_move(selection, player_token)
-        ## Done the player's turn
-    else:
-        # AI is supposed to be "Minimax", meaning it looks a certain distance in the future (board states) then chooses the best outcome.
-        print("Beep bop, I am a robot.")
+def check_four_winner():
+    global game_over
+    # Piece dropped, check for a winner
+    # This process is a mess and could be improved
+    received_point = check_for_four()
+    #print(received_point)
+    if received_point == [-99, -99]:
+        # Show results first
+        printBoard()
+        game_over = True
+        print("Tie.")
+    elif not received_point == [-1, -1]:
+        printBoard()
+        ## This funky ternary knows who won by the founded 4 string of pieces (if there are no moves, then someone cheated!)
+        print(("Player " if moves[-1].data == 2 else "AI ") + "has won.") # If it can't find moves[-1], then nobody moved
+        game_over = True
 
-        val = see_the_future(1)
-        print("I've seen the future: " + str(val))
-        make_move(val[1], ai_token)
-    
-    #s = ""
-    #for move in moves:
-    #    s = s + str(move.x) + "," + str(move.y) + ":" + str(move.data) + " "
-    #print(s)
+def print_moves():
+    print("These were the games moves:")
+    for move in moves:
+        print(move)
 
 # Refreshes the lowest known row per column for all columns
 def refresh_lowest_all():
@@ -109,9 +117,6 @@ def refresh_lowest_at(col):
             lowest_in_column[col] = row
         else:
             break
-
-def see_the_future(depth):
-    return minimax(depth)
 
 def minimax(depth):
     # Base condition, evaluate the final board state
@@ -371,6 +376,7 @@ def test_score_player():
 ## A move is defined as the position and piece that was placed.
 ## The PVector object stores the location and piece data in a single object
 # This concept allows us to make and unmake moves easily for recursive tree searching
+# Yes, these could be only two methods with an argument for both, but I like this more
 def make_move(column, token): # This is the one that should be used normally, letting the program take care of the row
     move = PVector(column, lowest_in_column[column], token)
     moves.append(move)
@@ -382,7 +388,6 @@ def predict_move(column, token):
     move = PVector(column, lowest_in_column[column], token)
     board[move.y][move.x] = token
     refresh_lowest_at(column)
-    #print("Pridict " + str(move))
     return move
 
 def undo_move(): # Undo-s the last move made
